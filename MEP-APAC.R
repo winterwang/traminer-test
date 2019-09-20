@@ -39,7 +39,7 @@ ID_DPC <- as.character(unique(DPC0$ID))
 table(ID_DPC %in% ID_MED)
  
 # FALSE  TRUE 
-# 1      5307 
+#     1  5202  
 
 MED[MED$ID == ID_DPC[1], ] # so only 1 patient in DPC data is not recored in MED data
 
@@ -134,3 +134,99 @@ icd.seq <- seqdef(icd10_test, var = c("ID", "from", "to", "ICD10"), informat = "
 
 seqiplot(icd.seq, title = "Index plot (first 10 sequences)",
          withlegend = FALSE)
+
+
+seqtab(icd.seq, tlim = 1:4)
+
+# most patients' sequence are unique and therefore maybe the list of ICD10 should be defined. 
+
+
+# lets try to focus on ICD10 code start with I  ---------------------------
+
+# ie. cardiovascular diseases 
+
+ICD_i_med <- MED %>% 
+  filter(str_detect(ICD10, 'I'))
+ICD_i_dpc <- DPC0 %>% 
+  filter(str_detect(ICD10, 'I'))
+
+
+# lets combine the two data sets ------------------------------------------
+
+ICD_i <- rbind(ICD_i_med, ICD_i_dpc)
+
+ICD_i <- ICD_i %>% 
+  arrange(ID, receDate)
+head(ICD_i)
+
+
+
+
+
+# permute disease for the same month ------------------------------------------
+
+set.seed(1234)
+
+
+
+icd_i_sample <- ICD_i %>% 
+  mutate(From = substr(receDate, 1, 6)) %>% 
+  group_by(ID, From) %>% 
+  sample_n(1) 
+
+icd_i_sam_dist <- icd_i_sample %>% 
+  group_by(ID) %>% 
+  distinct(ICD10, .keep_all = TRUE)
+
+# icd_i_sample %>%
+#   group_by(ID) %>%
+#   summarise(first=head(ICD10, 1), count=n_distinct(ICD10))
+
+
+icd_i_sam_dist$receDate <-  as.Date(as.character(icd_i_sam_dist$receDate), "%Y%m%d")
+
+icd_i_sam_dist$To <- icd_i_sam_dist$receDate - 1
+
+
+icdi_distana <- icd_i_sam_dist %>% 
+  mutate(To = lead(To)) %>% 
+  select(c(1, 2, 3, 7))
+
+icdi_distana <- icd10_distana %>% 
+  select(c(1, 2, 4, 3)) %>% 
+  group_by(ID) %>% 
+  mutate(Index = row_number())
+
+
+# the maximum of receDate 
+
+max(icdi_distana$receDate)
+# [1] "2017-12-01"
+
+# recode the final "To" date for each patient into 2017-12-31
+
+icdi_distana$To[is.na(icdi_distana$To)] <- as.Date("2017-12-31")
+
+
+
+
+# do traminer -------------------------------------------------------------
+
+library(TraMineR)
+
+icdi_distana <- icdi_distana %>% 
+  mutate(ICD10_2 = substr(ICD10, 1, 3)) 
+  
+  
+LA.labels <- seqstatl(icdi_distana$ICD10_2)
+
+LA.states <- 1:length(LA.labels)
+
+
+icdi_distana <- icdi_distana %>% 
+  mutate(from = as.numeric(receDate), 
+         to = as.numeric(To))
+icdi_distana <- as.data.frame(icdi_distana)
+
+icd.seq <- seqdef(icdi_distana, var = c("ID", "from", "to", "ICD10_2"), informat = "SPELL", 
+                  states = LA.states, labels = LA.labels, process = FALSE)
