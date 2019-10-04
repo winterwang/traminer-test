@@ -1,0 +1,86 @@
+---
+title: "seqHMM"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(TraMineR)
+library(dplyr)
+library(qualV)
+```
+
+```{r}
+data("mvad")
+mvad.alphabet<-c("employment","FE","HE","joblessness","school","training")
+mvad.seq<-seqdef(mvad,17:86,xtstep=6,alphabet=mvad.alphabet)
+```
+
+
+```{r}
+testdata=tribble(~t1,~t2,~t3,~t4,
+                 "A","B","C","D",
+                 NA,"C","D","B",
+                 "B","A","C","D")
+
+test.seq=seqdef(testdata,1:4,xtstep=4,c("A","B","C","D"))
+```
+
+
+```{r}
+aa=seqdss(test.seq, with.missing=TRUE)
+
+#Display the sequences
+str_seq=as.character(aa[1,])
+
+rr=LCS(as.character(aa[1,]),as.character(aa[2,]))
+       
+tmp=rr$LCS
+
+aa=vector(mode="character",length=2L)
+aa[1]=paste0(tmp,collapse="-")
+aa[2]=paste0(tmp[1:2],collapse="-")
+
+tmp=data.frame(seqdecomp(data.frame(aa)))
+colnames(tmp)=paste0("t",1:2)
+
+tmp.seq<-seqdef(tmp,1:10,xtstep=3,alphabet=1:4)
+```
+
+```{r}
+tmp.om<-seqdist(tmp.seq,method="OM",indel=1,sm="TRATE")
+```
+
+
+```{r}
+#Common longest subsequence
+tt=seqLLCS(aa[1,], aa[2,])
+```
+
+
+```{r}
+mvad.om<-seqdist(mvad.seq,method="OM",indel=1,sm="TRATE")
+```
+
+```{r}
+library("cluster")
+clusterward<-agnes(mvad.om,diss=TRUE,method="ward")
+mvad.cl4<-cutree(clusterward,k=4)
+cl4.lab=factor(mvad.cl4,labels=paste("Cluster",1:4))
+
+mvad.cl4
+```
+
+```{r}
+#Visualizing individual sequences
+seqdplot(mvad.seq,group=cl4.lab,border=NA)
+```
+
+```{r}
+#Tabulation of frequent sequences
+seqtab(mvad.seq,idxs=1:4)
+```
+

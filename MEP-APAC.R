@@ -192,16 +192,18 @@ icdi_distana <- icd_i_sam_dist %>%
   mutate(To = lead(To)) %>% 
   select(c(1, 2, 3, 7))
 
-icdi_distana <- icd10_distana %>% 
+icdi_distana <- icdi_distana %>% 
   select(c(1, 2, 4, 3)) %>% 
   group_by(ID) %>% 
   mutate(Index = row_number())
 
 
-# the maximum of receDate 
+# the maximum and of receDate 
 
 max(icdi_distana$receDate)
 # [1] "2017-12-01"
+
+min(icdi_distana$receDate)
 
 # recode the final "To" date for each patient into 2017-12-31
 
@@ -209,24 +211,83 @@ icdi_distana$To[is.na(icdi_distana$To)] <- as.Date("2017-12-31")
 
 
 
+# recode ID  --------------------------------------------------------------
 
+# ie create group id as a new variable
+
+icdi_distanaPID <- icdi_distana %>% 
+  group_by(ID) %>% 
+  mutate(PID = group_indices()) %>% 
+  ungroup() %>% 
+  select(c(6, 2, 3, 4, 5))
+
+icdi_distanaPID <- icdi_distanaPID %>% 
+  mutate(timediff = as.numeric(To - receDate)/365.25) %>% 
+  group_by(PID) %>% 
+  mutate(from = row_number()) %>% 
+  ungroup() %>% 
+  # mutate(to = round(timediff)) %>% 
+  # mutate(to = if_else(to <= from, from + 1, to)) 
+  mutate(to = from)
+  
+  
 # do traminer -------------------------------------------------------------
 
 library(TraMineR)
 
-icdi_distana <- icdi_distana %>% 
+icdi_distanaPID <- icdi_distanaPID %>% 
   mutate(ICD10_2 = substr(ICD10, 1, 3)) 
+
+icdi_distanaPID <- icdi_distanaPID %>% 
+  mutate(CVD = if_else(grepl("I0[0-2]", 
+                             icdi_distanaPID$ICD10_2), "Acute rheumatic fever", 
+                if_else(grepl("I0[5-9]", 
+                              icdi_distanaPID$ICD10_2), "Chronic rheumatic heart diseases", 
+                 if_else(grepl("I1[0-5]", 
+                               icdi_distanaPID$ICD10_2), "Hypertensive diseases", 
+                  if_else(grepl("I2[0-5]", 
+                                icdi_distanaPID$ICD10_2), "Ischaemic heart diseases", 
+                  if_else(grepl("I2[6-8]", 
+                                icdi_distanaPID$ICD10_2), "Pulmonary heart disease", 
+                  if_else(grepl("I[3-5][0-9]", 
+                                icdi_distanaPID$ICD10_2), "Other forms of heart disease", 
+                  if_else(grepl("I6[0-9]", 
+                                icdi_distanaPID$ICD10_2), "Cerebrovascular diseases", 
+                  if_else(grepl("I7[0-9]", 
+                                icdi_distanaPID$ICD10_2), "Diseases of arteries", 
+                  if_else(grepl("I8[0-9]", 
+                                icdi_distanaPID$ICD10_2), "Diseases of veins", 
+                  if_else(grepl("I9[5-9]", 
+                                icdi_distanaPID$ICD10_2), "Other and unspecified", "NA")))))))))))
   
   
-LA.labels <- seqstatl(icdi_distana$ICD10_2)
-
-LA.states <- 1:length(LA.labels)
+LA.labels <- seqstatl(icdi_distanaPID$CVD)
 
 
-icdi_distana <- icdi_distana %>% 
-  mutate(from = as.numeric(receDate), 
-         to = as.numeric(To))
-icdi_distana <- as.data.frame(icdi_distana)
 
-icd.seq <- seqdef(icdi_distana, var = c("ID", "from", "to", "ICD10_2"), informat = "SPELL", 
+# LA.states <- 1:length(LA.labels)
+LA.states <- c("ARF", "CD", "CRHD", "DA", "DV", "HD", "IHD", "OU", "OHD", "PHD")
+
+# icdi_distanaPID <- icdi_distanaPID %>% 
+#   mutate(from = from, 
+#          to = to)
+
+icdi_distanaPID <- as.data.frame(icdi_distanaPID)
+
+icd.seq <- seqdef(icdi_distanaPID, var = c("PID", "from", "to", "CVD"), informat = "SPELL", 
                   states = LA.states, labels = LA.labels, process = FALSE)
+
+
+print(icd.seq[1:5, ], format = "SPS")
+
+seqiplot(icd.seq, with.legend = "none")
+
+seqtab(icd.seq, idxs = 1:4)
+
+icd.trate <- seqtrate(icd.seq)
+round(icd.trate, 2)
+
+
+icd.om <- seqdist(icd.seq, method = "OM", indel = 1, sm = "TRATE")
+library(cluster)
+clusterward <- agnes(icd.om, diss = TRUE, method = "ward")

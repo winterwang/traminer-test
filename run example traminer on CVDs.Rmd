@@ -1,0 +1,276 @@
+---
+title: "run Traminer with the example data "
+author: "Chaochen Wang"
+date: "2019-09-13, `r Sys.Date()` updated"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# run Traminer with the example data --------------------------------------
+
+
+
+
+```{r}
+library(tidyverse)
+
+# set up the path of data location
+path <- c("C:/Users/C.Wang/Google ドライブ/Chao/Work with Thomas Laurent/2019-09-13/MEP-APAC-Pain_20181019/MEP-APAC-Pain_20181019")
+
+# read in two data sets
+Sippei <- read.csv(paste(path, "/04_med_sippei.csv", sep = ""))
+DPC <- read.csv(paste(path, "/08_dpc_sippei.csv", sep = ""))
+
+# select only the needed variables
+MED <- Sippei %>% 
+  select(c(4, 3, 5, 9, 7))
+  
+DPC0 <- DPC %>% 
+  select(c(4, 3, 5, 9, 7))
+# rename the names in English
+names(MED) <- c("ID", "receDate", "ICD10", "Flag_uta", "ICDcoded")
+names(DPC0) <- c("ID", "receDate", "ICD10", "Flag_uta", "ICDcoded")
+
+
+
+# remove diagnosis with doubt uta = 1, remove ICD10 codes empty and 999
+MED <- MED %>% 
+  filter(Flag_uta == 0 & ICDcoded != 999 & ICD10 != "") %>% 
+  mutate(ICD10 = as.character(ICD10))
+head(MED)
+ID_MED <- as.character(unique(MED$ID))
+
+
+DPC0 <- DPC0 %>% 
+  # select(c(4, 3, 5, 9, 7)) %>% 
+  filter(Flag_uta == 0 & ICDcoded != 999 & ICD10 != "") %>% 
+  mutate(ICD10 = as.character(ICD10))
+head(DPC0)
+
+ID_DPC <- as.character(unique(DPC0$ID))
+
+
+table(ID_DPC %in% ID_MED)
+ 
+# FALSE  TRUE 
+#     1  5202  
+
+# only 1 patient in DPC databases is not recorded in MED database
+```
+
+# lets try to focus on ICD10 code start with I  ---------------------------
+
+
+```{r}
+
+# ie. cardiovascular diseases 
+
+ICD_i_med <- MED %>% 
+  filter(str_detect(ICD10, 'I'))
+ICD_i_dpc <- DPC0 %>% 
+  filter(str_detect(ICD10, 'I'))
+
+
+# lets combine the two data sets ------------------------------------------
+
+ICD_i <- rbind(ICD_i_med, ICD_i_dpc)
+
+ICD_i <- ICD_i %>% 
+  arrange(ID, receDate)
+head(ICD_i, 20)
+```
+
+
+# permute disease for the same month ------------------------------------------
+
+```{r}
+
+set.seed(1234)
+
+icd_i_sample <- ICD_i %>% 
+  mutate(From = substr(receDate, 1, 6)) %>% 
+  group_by(ID, From) %>% 
+  sample_n(1) 
+
+# quite a few patients have several diseases diagnosed at the same month
+
+
+# keep only the first diagnosis of the same disease
+icd_i_sam_dist <- icd_i_sample %>% 
+  group_by(ID) %>% 
+  distinct(ICD10, .keep_all = TRUE)
+
+# many diseases are diagnosed for several times. 
+
+
+icd_i_sam_dist$receDate <-  as.Date(as.character(icd_i_sam_dist$receDate), "%Y%m%d")
+
+icd_i_sam_dist$To <- icd_i_sam_dist$receDate
+
+
+icd_i_sam_dist <- icd_i_sam_dist %>% 
+  select(c(1, 2, 7, 3))
+
+
+icd_i_sam_dist <- icd_i_sam_dist %>% 
+  group_by(ID) %>% 
+  mutate(Index = row_number()) %>% 
+  ungroup()
+```
+
+# recode ID  --------------------------------------------------------------
+
+```{r}
+
+# ie create group id as a new variable
+
+icdi_distanaPID <- icd_i_sam_dist %>% 
+  group_by(ID) %>% 
+  mutate(PID = group_indices()) %>% 
+  ungroup() %>% 
+  select(c(6, 2, 3, 4, 5))
+
+icdi_distanaPID <- icdi_distanaPID %>% 
+  group_by(PID) %>% 
+  mutate(from = row_number()) %>% 
+  ungroup() %>% 
+  mutate(to = from)
+
+```
+
+
+# do traminer -------------------------------------------------------------
+
+```{r}
+
+library(TraMineR)
+
+icdi_distanaPID <- icdi_distanaPID %>% 
+  mutate(ICD10_2 = substr(ICD10, 1, 3)) 
+
+icdi_distanaPID <- icdi_distanaPID %>% 
+  mutate(CVD = if_else(grepl("I0[0-2]", 
+                             icdi_distanaPID$ICD10_2), "Acute rheumatic fever", 
+                if_else(grepl("I0[5-9]", 
+                              icdi_distanaPID$ICD10_2), "Chronic rheumatic heart diseases", 
+                 if_else(grepl("I1[0-5]", 
+                               icdi_distanaPID$ICD10_2), "Hypertensive diseases", 
+                  if_else(grepl("I2[0-5]", 
+                                icdi_distanaPID$ICD10_2), "Ischaemic heart diseases", 
+                  if_else(grepl("I2[6-8]", 
+                                icdi_distanaPID$ICD10_2), "Pulmonary heart disease", 
+                  if_else(grepl("I[3-5][0-9]", 
+                                icdi_distanaPID$ICD10_2), "Other forms of heart disease", 
+                  if_else(grepl("I6[0-9]", 
+                                icdi_distanaPID$ICD10_2), "Cerebrovascular diseases", 
+                  if_else(grepl("I7[0-9]", 
+                                icdi_distanaPID$ICD10_2), "Diseases of arteries", 
+                  if_else(grepl("I8[0-9]", 
+                                icdi_distanaPID$ICD10_2), "Diseases of veins", 
+                  if_else(grepl("I9[5-9]", 
+                                icdi_distanaPID$ICD10_2), "Other and unspecified", "NA")))))))))))
+  
+  
+LA.labels <- seqstatl(icdi_distanaPID$CVD)
+LA.labels # broadly CVD categorised into 10 groups
+
+LA.states <- c("ARF", "CD", "CRHD", "DA", "DV", "HD", "IHD", "OU", "OHD", "PHD")
+icdi_distanaPID <- as.data.frame(icdi_distanaPID)
+
+
+icd.seq <- seqdef(icdi_distanaPID, var = c("PID", "from", "to", "CVD"), informat = "SPELL", 
+                  states = LA.states, labels = LA.labels, process = FALSE)
+# first 10 sequences
+seqiplot(icd.seq, cex.legend = 0.55)
+
+
+seqtab(icd.seq, idxs = 1:20)
+# the most frequent sequence is hypertensive diseases all the time. 
+
+length(unique(icdi_distanaPID$PID)) #n of patients have CVD diganosed >= 1 time
+
+# state distribution 
+seqdplot(icd.seq, cex.legend = 0.55)
+
+# the number of state changes
+# seqtransn(icd.seq)
+
+# calculate the distances 
+
+scost <- seqsubm(icd.seq, method = "TRATE")
+
+
+icd.om <- seqdist(icd.seq, method = "OM", indel = 1, full.matrix = FALSE, sm  = scost)
+```
+
+# reduce number of patients to 1000 and see what is inside dist file 
+
+```{r}
+
+PID <- unique(icdi_distanaPID$PID)
+
+
+set.seed(1234)
+
+sam <- sample(PID, size = 1000)
+
+icd.sam <- icdi_distanaPID %>% 
+  filter(PID %in% sam)
+
+
+
+
+icd.seq <- seqdef(icd.sam, var = c("PID", "from", "to", "CVD"), informat = "SPELL", 
+                  states = LA.states, labels = LA.labels, process = FALSE)
+# first 10 sequences
+seqiplot(icd.seq, cex.legend = 0.55)
+
+
+seqtab(icd.seq, idxs = 1:20)
+# the most frequent sequence is Diseases of veins all the time. 
+
+# state distribution 
+seqdplot(icd.seq, cex.legend = 0.55)
+
+# calculate the distances 
+
+scost <- seqsubm(icd.seq, method = "TRATE")
+
+
+icd.om <- seqdist(icd.seq, method = "OM", indel = 1, full.matrix = FALSE, sm  = scost)
+
+library(cluster)
+clusterward <- agnes(icd.om, diss = TRUE, method = "ward")
+icd.cl4 <- cutree(clusterward, k = 4)
+
+cl4.lab <- factor(icd.cl4, labels = paste("Cluster", 1:4))
+
+seqdplot(icd.seq, group = cl4.lab, cex.legend = 0.55)
+```
+
+```{r}
+
+a1=seqdss(icd.seq, with.missing=TRUE)
+
+#Display the 1st sequences
+str_seq1=as.character(a1[1,])
+
+rr=LCS(as.character(a1[1,]),as.character(a1[2,]))
+       
+tmp=rr$LCS
+
+aa=vector(mode="character",length=2L)
+aa[1]=paste0(tmp,collapse="-")
+aa[2]=paste0(tmp[1:2],collapse="-")
+
+tmp=data.frame(seqdecomp(data.frame(aa)))
+colnames(tmp)=paste0("t",1:2)
+
+tmp.seq<-seqdef(tmp,1:10,xtstep=3,alphabet=1:4)
+```
+
