@@ -21,7 +21,7 @@ library(tidyverse)
 
 # set up the path of data location
 path <- c("C:/Users/C.Wang/Google ドライブ/Chao/Work with Thomas Laurent/2019-09-13/MEP-APAC-Pain_20181019/MEP-APAC-Pain_20181019")
-
+# you should change path to the data file on your machine
 # read in two data sets
 Sippei <- read.csv(paste(path, "/04_med_sippei.csv", sep = ""))
 DPC <- read.csv(paste(path, "/08_dpc_sippei.csv", sep = ""))
@@ -155,25 +155,35 @@ icdi_distanaPID <- icdi_distanaPID %>%
 
 icdi_distanaPID <- icdi_distanaPID %>% 
   mutate(CVD = if_else(grepl("I0[0-2]", 
-                             icdi_distanaPID$ICD10_2), "Acute rheumatic fever", 
+                             icdi_distanaPID$ICD10_2), 
+                       "Acute rheumatic fever", 
                 if_else(grepl("I0[5-9]", 
-                              icdi_distanaPID$ICD10_2), "Chronic rheumatic heart diseases", 
+                              icdi_distanaPID$ICD10_2), 
+                        "Chronic rheumatic heart diseases", 
                  if_else(grepl("I1[0-5]", 
-                               icdi_distanaPID$ICD10_2), "Hypertensive diseases", 
+                               icdi_distanaPID$ICD10_2), 
+                         "Hypertensive diseases", 
                   if_else(grepl("I2[0-5]", 
-                                icdi_distanaPID$ICD10_2), "Ischaemic heart diseases", 
+                                icdi_distanaPID$ICD10_2), 
+                          "Ischaemic heart diseases", 
                   if_else(grepl("I2[6-8]", 
-                                icdi_distanaPID$ICD10_2), "Pulmonary heart disease", 
+                                icdi_distanaPID$ICD10_2), 
+                          "Pulmonary heart disease", 
                   if_else(grepl("I[3-5][0-9]", 
-                                icdi_distanaPID$ICD10_2), "Other forms of heart disease", 
+                                icdi_distanaPID$ICD10_2), 
+                          "Other forms of heart disease", 
                   if_else(grepl("I6[0-9]", 
-                                icdi_distanaPID$ICD10_2), "Cerebrovascular diseases", 
+                                icdi_distanaPID$ICD10_2), 
+                          "Cerebrovascular diseases", 
                   if_else(grepl("I7[0-9]", 
-                                icdi_distanaPID$ICD10_2), "Diseases of arteries", 
+                                icdi_distanaPID$ICD10_2), 
+                          "Diseases of arteries", 
                   if_else(grepl("I8[0-9]", 
-                                icdi_distanaPID$ICD10_2), "Diseases of veins", 
+                                icdi_distanaPID$ICD10_2), 
+                          "Diseases of veins", 
                   if_else(grepl("I9[5-9]", 
-                                icdi_distanaPID$ICD10_2), "Other and unspecified", "NA")))))))))))
+                                icdi_distanaPID$ICD10_2), 
+                          "Other and unspecified", "NA")))))))))))
   
   
 LA.labels <- seqstatl(icdi_distanaPID$CVD)
@@ -265,10 +275,11 @@ library(naniar)
 
 a1=seqdss(icd.seq, with.missing=TRUE)
 
+a1 <- as.data.frame(a1)
+
 a1 <- a1 %>% 
   replace_with_na_all(condition = ~.x == "%")
 
-a1 <- as.data.frame(a1)
 a1
 
 # [>] state coding:
@@ -292,8 +303,10 @@ str_seq1
 
 
 
-rr <- LCS(as.character(unlist(a1[1, ])), 
-          as.character(unlist(a1[2, ])))
+rr <- LCS(as.character(unlist(a1[1, ])[!is.na(unlist(a1[1, ]))]), 
+          as.character(unlist(a1[2, ])[!is.na(unlist(a1[2, ]))]))
+rr <- LCS(as.character(unlist(a1[23, ])[!is.na(unlist(a1[23, ]))]), 
+          as.character(unlist(a1[24, ])[!is.na(unlist(a1[24, ]))]))
 
 rr0 <- list()
 # res=matrix(nrow=dim(a1)[1],ncol=dim(a1)[1])
@@ -301,9 +314,9 @@ rr0 <- list()
 for(i in 1:dim(a1)[1]) {
   for(j in 1:dim(a1)[1]){
     if (i != j){
-      rr <-  LCS(as.character(unlist(a1[i, ])), 
-                  as.character(unlist(a1[j, ])))
-      rr0[[paste0("sequence", i)]] <- rr$LCS
+      rr <-  LCS(as.character(unlist(a1[i, ])[!is.na(unlist(a1[i, ]))]), 
+                  as.character(unlist(a1[j, ])[!is.na(unlist(a1[j, ]))]))
+      rr0[[paste0("sequence", i, j)]] <- rr$LCS
     }  
     }
 }
