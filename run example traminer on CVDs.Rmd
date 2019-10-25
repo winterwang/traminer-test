@@ -20,7 +20,13 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 
 # set up the path of data location
-path <- c("C:/Users/C.Wang/Google ドライブ/Chao/Work with Thomas Laurent/2019-09-13/MEP-APAC-Pain_20181019/MEP-APAC-Pain_20181019")
+# path <- c("C:/Users/C.Wang/Google ドライブ/Chao/Work with Thomas Laurent/2019-09-13/MEP-APAC-Pain_20181019/MEP-APAC-Pain_20181019")
+
+
+path <- c("G:/My Drive/Chao/Work with Thomas Laurent/2019-09-13/MEP-APAC-Pain_20181019/MEP-APAC-Pain_20181019")
+
+
+
 # you should change path to the data file on your machine
 # read in two data sets
 Sippei <- read.csv(paste(path, "/04_med_sippei.csv", sep = ""))
