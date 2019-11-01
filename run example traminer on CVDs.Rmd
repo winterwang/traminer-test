@@ -316,13 +316,13 @@ rr <- LCS(as.character(unlist(a1[23, ])[!is.na(unlist(a1[23, ]))]),
 
 rr0 <- list()
 # res=matrix(nrow=dim(a1)[1],ncol=dim(a1)[1])
-
-for(i in 1:dim(a1)[1]) {
-  for(j in 1:dim(a1)[1]){
+# dim(a1)[1]
+for(i in 1:100) {
+  for(j in 1:100){
     if (i != j){
       rr <-  LCS(as.character(unlist(a1[i, ])[!is.na(unlist(a1[i, ]))]), 
                   as.character(unlist(a1[j, ])[!is.na(unlist(a1[j, ]))]))
-      rr0[[paste0("sequence", i, j)]] <- rr$LCS
+      rr0[[paste0("sequence", i, " and ", j)]] <- rr$LCS
     }  
     }
 }
